@@ -1,0 +1,24 @@
+# Build outputs
+Debug/
+Release/
+build/
+
+# STM32CubeIDE / Eclipse metadata
+.metadata/
+.settings/
+*.launch
+
+# Generated/temporary
+*.o
+*.d
+*.elf
+*.map
+*.list
+*.su
+*.hex
+*.bin
+*.log
+
+# OS/editor
+.DS_Store
+*~

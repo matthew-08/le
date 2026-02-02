@@ -76,21 +76,7 @@ stable_state_t read_pin () {
 
 void check_button_state (uint32_t now) {
 
-	static stable_state_t candidate_state;
-	static bool debouncing = false;
-	static uint32_t steady_state_threshold;
-	if (button_isr) {
-		button_isr = false;
-		candidate_state = read_pin();
-		steady_state_threshold = now + 20u;
-		debouncing = true;
-	}
 
-	if (debouncing && (int32_t)(now - steady_state_threshold) >= 0) {
-		current_stable_state = (candidate_state == read_pin())
-				? candidate_state : current_stable_state;
-		debouncing = false;
-	}
 
 }
 

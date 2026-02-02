@@ -122,7 +122,6 @@ btn_action_t btn_event_handler (btn_ctx_t *b, uint32_t now, btn_event_t e) {
 			if (e == BTN_EVT_PRESSED) {
 				b->st = PRESSED;
 				b->t_down = now;
-				b->long_fired = false;
 			}
 			break;
 		case PRESSED:
@@ -131,32 +130,31 @@ btn_action_t btn_event_handler (btn_ctx_t *b, uint32_t now, btn_event_t e) {
 				b->click_count++;
 				b->t_multi_deadline = now + 400u;
 			}
+			else if (e == BTN_EVT_NONE && (uint32_t)(now - b->t_down) >= 700u) {
+				b->click_count = 0;
+				b->st = LONG_PRESSED;
+				return ACT_LONG;
+			}
 			break;
 		case MULTI_PRESS:
 			if (e == BTN_EVT_PRESSED) {
 				b->t_multi_deadline = now + 400u;
 				b->click_count++;
-
+			}
+			else if (e == BTN_EVT_NONE && (int32_t)(now - b->t_multi_deadline) >= 0) {
+				btn_action_t a = (b->click_count >= 3) ? ACT_TRIPLE :
+						(b->click_count == 2) ? ACT_DOUBLE : ACT_SINGLE;
+				b->click_count = 0;
+				b->st = IDLE;
+				return a;
 			}
 			break;
-	}
-
-	if (b->st == PRESSED && !b->long_fired && (uint32_t)(now - b->t_down) >= 700u) {
-				b->long_fired = true;
-				b->click_count = 0;         // long press cancels clicks
+		case LONG_PRESSED:
+			if (e == BTN_EVT_RELEASED) {
 				b->st = IDLE;
-				return ACT_LONG;
-		}
-
-				  if (b->st == MULTI_PRESS && (int32_t)(now - b->t_multi_deadline) >= 0) {
-				    btn_action_t a =
-				      (b->click_count >= 3) ? ACT_TRIPLE :
-				      (b->click_count == 2) ? ACT_DOUBLE :
-				                              ACT_SINGLE;
-				  b->click_count = 0;
-				  b->st = IDLE;
-				 return a;
+				b->click_count = 0;
 			}
+	}
 
 	return ACT_NONE;
 }

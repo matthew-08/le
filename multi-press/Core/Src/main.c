@@ -62,36 +62,137 @@ static void MX_TIM1_Init(void);
 /* USER CODE BEGIN 0 */
 
 typedef enum {
+	IDLE = 0,
+	PRESSED = 1,
+	MULTI_PRESS = 2,
+	LONG_PRESSED = 3,
+} btn_state_t;
+
+typedef enum {
+  ACT_NONE = 0,
+  ACT_SINGLE,
+  ACT_DOUBLE,
+  ACT_TRIPLE,
+  ACT_LONG,
+} btn_action_t;
+
+typedef enum {
+  BTN_EVT_NONE = 0,
+  BTN_EVT_PRESSED,
+  BTN_EVT_RELEASED,
+} btn_event_t;
+
+typedef enum {
 	STABLE_PRESSED = 1,
 	STABLE_RELEASED = 0,
 } stable_state_t;
 
+typedef struct {
+	stable_state_t stable;
+	stable_state_t candidate;
+	bool debouncing;
+	uint32_t debounce_deadline;
+
+	btn_state_t st;
+	uint32_t t_down;
+	uint32_t t_multi_deadline;
+	uint32_t click_count;
+	bool long_fired;
+} btn_ctx_t;
+
+static btn_ctx_t btn_context_obj;
+btn_ctx_t *btn = &btn_context_obj;
+
 volatile bool button_isr = false;
-volatile stable_state_t current_stable_state = STABLE_RELEASED;
 
 stable_state_t read_pin () {
 	return (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_8) == GPIO_PIN_RESET) ?
 			STABLE_PRESSED: STABLE_RELEASED;
 }
 
-void check_button_state (uint32_t now) {
+// state machine():
+// if (EVENT_PRESS)
+//   if (IDLE) set press_start_time, go into PRESSED state.
+//   if (PRESSED):
+//    is the
 
-	static stable_state_t candidate_state;
-	static bool debouncing = false;
-	static uint32_t steady_state_threshold;
-	if (button_isr) {
-		button_isr = false;
-		candidate_state = read_pin();
-		steady_state_threshold = now + 20u;
-		debouncing = true;
+btn_action_t btn_event_handler (btn_ctx_t *b, uint32_t now, btn_event_t e) {
+	switch (b->st) {
+		case IDLE:
+			if (e == BTN_EVT_PRESSED) {
+				b->st = PRESSED;
+				b->t_down = now;
+			}
+			break;
+		case PRESSED:
+			if (e == BTN_EVT_RELEASED) {
+				b->st = MULTI_PRESS;
+				b->click_count++;
+				b->t_multi_deadline = now + 400u;
+			}
+			// I like this because it makes more sense to have long_pressed logic happen in a pressed state rather than
+			// outside the flow of this switch statement.
+			// in this way, this switch handler kind o mixdes both time and event based logic.
+			else if (e == BTN_EVT_NONE && (uint32_t)(now - b->t_down) >= 700u) {
+				b->click_count = 0;
+				b->st = LONG_PRESSED;
+				return ACT_LONG;
+			}
+			break;
+		case MULTI_PRESS:
+			if (e == BTN_EVT_PRESSED) {
+				b->t_multi_deadline = now + 400u;
+				b->click_count++;
+			}
+			else if (e == BTN_EVT_NONE && (int32_t)(now - b->t_multi_deadline) >= 0) {
+				btn_action_t a =
+						(b->click_count >= 3) ? ACT_TRIPLE :
+						(b->click_count == 2) ? ACT_DOUBLE :
+						ACT_SINGLE;
+				b->click_count = 0;
+				b->st = IDLE;
+				return a;
+			}
+			break;
+		case LONG_PRESSED:
+			if (e == BTN_EVT_RELEASED) {
+				b->st = IDLE;
+				b->click_count = 0;
+			}
 	}
 
-	if (debouncing && (int32_t)(now - steady_state_threshold) >= 0) {
-		current_stable_state = (candidate_state == read_pin())
-				? candidate_state : current_stable_state;
-		debouncing = false;
+	return ACT_NONE;
+}
+
+btn_event_t btn_debounce_update (btn_ctx_t *b, uint32_t now, bool irq_seen) {
+
+	if (irq_seen) {
+		b->candidate = read_pin();
+		b->debounce_deadline = now + 20u;
+		b->debouncing = true;
 	}
 
+	if (b->debouncing && (int32_t)(now - b->debounce_deadline) >= 0) {
+		b->debouncing = false;
+
+		stable_state_t sample = read_pin();
+		if (sample == b->candidate && sample != b->stable) {
+			b->stable = sample;
+			return (sample == STABLE_PRESSED) ? BTN_EVT_PRESSED : BTN_EVT_RELEASED;
+		}
+	}
+
+	return BTN_EVT_NONE;
+
+}
+
+void blink_led (uint32_t times, uint32_t delay) {
+	  for (int i = 0; i < times; i++) {
+		  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_6);
+		  HAL_Delay(delay);
+		  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_6);
+		  HAL_Delay(delay);
+	  }
 }
 
 
@@ -130,18 +231,33 @@ int main(void)
   /* USER CODE BEGIN WHILE */
 
 
-
+  btn->stable = STABLE_RELEASED;
+  btn->st = IDLE;
+  btn->debouncing = false;
   while (1)
   {
 
+	  uint32_t now = HAL_GetTick();
 
+	    bool irq_seen = button_isr;
+	    button_isr = false;
 
+	    btn_event_t ev = btn_debounce_update(btn, now, irq_seen);
+	    btn_action_t act = btn_event_handler(btn, now, ev);
+
+	    switch (act) {
+	      case ACT_SINGLE: blink_led(1, 50); break;
+	      case ACT_DOUBLE: blink_led(2, 150);  break;
+	      case ACT_TRIPLE: blink_led(3, 300);  break;
+	      case ACT_LONG:   blink_led(10, 50); break;
+	      default: break;
+	    }
   }
   /* USER CODE END 3 */
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIOPIN) {
-	 exti_isr_count++;
+	 button_isr = true;
 }
 
 /**

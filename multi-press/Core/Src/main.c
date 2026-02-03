@@ -119,46 +119,16 @@ stable_state_t read_pin () {
 btn_action_t btn_event_handler (btn_ctx_t *b, uint32_t now, btn_event_t e) {
 	switch (b->st) {
 		case IDLE:
-			if (e == BTN_EVT_PRESSED) {
-				b->st = PRESSED;
-				b->t_down = now;
-			}
+
 			break;
 		case PRESSED:
-			if (e == BTN_EVT_RELEASED) {
-				b->st = MULTI_PRESS;
-				b->click_count++;
-				b->t_multi_deadline = now + 400u;
-			}
-			// I like this because it makes more sense to have long_pressed logic happen in a pressed state rather than
-			// outside the flow of this switch statement.
-			// in this way, this switch handler kind o mixdes both time and event based logic.
-			else if (e == BTN_EVT_NONE && (uint32_t)(now - b->t_down) >= 700u) {
-				b->click_count = 0;
-				b->st = LONG_PRESSED;
-				return ACT_LONG;
-			}
+
 			break;
 		case MULTI_PRESS:
-			if (e == BTN_EVT_PRESSED) {
-				b->t_multi_deadline = now + 400u;
-				b->click_count++;
-			}
-			else if (e == BTN_EVT_NONE && (int32_t)(now - b->t_multi_deadline) >= 0) {
-				btn_action_t a =
-						(b->click_count >= 3) ? ACT_TRIPLE :
-						(b->click_count == 2) ? ACT_DOUBLE :
-						ACT_SINGLE;
-				b->click_count = 0;
-				b->st = IDLE;
-				return a;
-			}
+
 			break;
 		case LONG_PRESSED:
-			if (e == BTN_EVT_RELEASED) {
-				b->st = IDLE;
-				b->click_count = 0;
-			}
+
 	}
 
 	return ACT_NONE;
@@ -167,19 +137,11 @@ btn_action_t btn_event_handler (btn_ctx_t *b, uint32_t now, btn_event_t e) {
 btn_event_t btn_debounce_update (btn_ctx_t *b, uint32_t now, bool irq_seen) {
 
 	if (irq_seen) {
-		b->candidate = read_pin();
-		b->debounce_deadline = now + 20u;
-		b->debouncing = true;
+
 	}
 
 	if (b->debouncing && (int32_t)(now - b->debounce_deadline) >= 0) {
-		b->debouncing = false;
 
-		stable_state_t sample = read_pin();
-		if (sample == b->candidate && sample != b->stable) {
-			b->stable = sample;
-			return (sample == STABLE_PRESSED) ? BTN_EVT_PRESSED : BTN_EVT_RELEASED;
-		}
 	}
 
 	return BTN_EVT_NONE;

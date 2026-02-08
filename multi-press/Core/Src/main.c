@@ -119,13 +119,29 @@ stable_state_t read_pin () {
 btn_action_t btn_event_handler (btn_ctx_t *b, uint32_t now, btn_event_t e) {
 	switch (b->st) {
 		case IDLE:
-
+			if (e == BTN_EVT_PRESSED) {
+				b->st = PRESSED;
+				b->t_down = now;
+				return;
+			}
 			break;
 		case PRESSED:
-
+			if (e == BTN_EVT_RELEASED) {
+				b->st = MULTI_PRESS;
+				b->t_multi_deadline = now + 400u;
+				b->click_count++;
+				return;
+			} else if (e == BTN_EVT_NONE && (now - b->t_down) >= 700u) {
+				b->st = LONG_PRESS;
+				b->click_count = 0;
+				return ACT_LONG;
+			}
 			break;
 		case MULTI_PRESS:
-
+			if (e == BTN_EVT_RELEASED) {
+				b->st = IDLE;
+				btn_action_t a = btn->click_count =
+			}
 			break;
 		case LONG_PRESSED:
 

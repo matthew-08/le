@@ -130,10 +130,21 @@ int main(void)
   /* USER CODE BEGIN WHILE */
 
 
+  uint32_t last_ms = HAL_GetTick();
+  uint32_t last_count = 0;
 
   while (1)
   {
+	  uint32_t now = HAL_GetTick();
 
+	  if ((now - last_ms) >= 30u) {
+		  uint32_t delta = exti_isr_count - last_count;
+
+		  last_count = exti_isr_count;
+		  last_ms += 30u;
+
+		  __NOP();
+	  }
 
 
   }

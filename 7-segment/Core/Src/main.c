@@ -35,6 +35,16 @@
 #define SER GPIO_PIN_8
 #define SCK GPIO_PIN_6
 #define RCK GPIO_PIN_5
+
+
+#define SEGMENT_E 0x20
+#define SEGMENT_D 0x01
+#define SEGMENT_C 0x40
+#define SEGMENT_B 0x10
+#define SEGMENT_A 0x08
+#define SEGMENT_F 0x04
+#define SEGMENT_G 0x02
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -46,6 +56,19 @@
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+const uint8_t digit_map[10] = {
+		SEGMENT_A | SEGMENT_B | SEGMENT_C | SEGMENT_F | SEGMENT_E | SEGMENT_D, // 0
+		SEGMENT_B | SEGMENT_C, // 1
+		SEGMENT_A | SEGMENT_B | SEGMENT_G | SEGMENT_E | SEGMENT_D, // 2
+		SEGMENT_A | SEGMENT_B | SEGMENT_G | SEGMENT_C | SEGMENT_D, // 3
+		SEGMENT_F | SEGMENT_B | SEGMENT_G| SEGMENT_C, // 4
+		SEGMENT_A | SEGMENT_C | SEGMENT_D | SEGMENT_F | SEGMENT_G,                   // 5
+		SEGMENT_A | SEGMENT_C | SEGMENT_D | SEGMENT_E | SEGMENT_F | SEGMENT_G,       // 6
+		SEGMENT_A | SEGMENT_B | SEGMENT_C,                                            // 7
+		SEGMENT_A | SEGMENT_B | SEGMENT_C | SEGMENT_D | SEGMENT_E | SEGMENT_F | SEGMENT_G, // 8
+		SEGMENT_A | SEGMENT_B | SEGMENT_C | SEGMENT_D | SEGMENT_F | SEGMENT_G        // 9
+};
+
 
 /* USER CODE END PV */
 
@@ -79,7 +102,15 @@ void shift_data (uint16_t data) {
 
 };
 
+
+void display_num (uint8_t num) {
+	if (num < 0 || num > 9) return;
+
+	shift_data(digit_map[num]);
+}
+
 /* USER CODE END 0 */
+
 
 /**
   * @brief  The application entry point.
@@ -118,7 +149,7 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-  shift_data(0x08);
+  display_num(0);
   // 1000 0000
   // 0000 0100
 
@@ -126,6 +157,11 @@ int main(void)
   {
 
     /* USER CODE END WHILE */
+
+	  for (int i = 0; i < 10; i++) {
+		  display_num(i);
+		  HAL_Delay(500);
+	  }
 
 
     /* USER CODE BEGIN 3 */

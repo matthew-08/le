@@ -76,7 +76,19 @@ stable_state_t read_pin () {
 
 void check_button_state (uint32_t now) {
 
+	static uint32_t last_ms = 0;
+	static stable_state_t candidate_state;
+	static bool debouncing = false;
 
+	if (button_isr && !debouncing) {
+		candidate_state = read_pin();
+		debouncing = true;
+		last_ms = now;
+	}
+
+	if (debouncing && (now - last_ms) >= 30) {
+		current_stable_state = (candidate_state == read_pin()) ? candidate_state : current_stable_state;
+	}
 
 }
 
